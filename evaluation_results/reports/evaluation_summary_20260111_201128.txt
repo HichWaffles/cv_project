@@ -1,0 +1,67 @@
+======================================================================
+MODEL EVALUATION SUMMARY
+======================================================================
+Timestamp: 20260111_201128
+
+
+======================================================================
+RandomForest Model
+======================================================================
+
+Model Info:
+  Size: 0.85 MB
+  n_estimators: 67
+  total_nodes: 13217
+  n_features: 15
+  model_classes: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'del', 'space']
+  requires_mediapipe: True
+
+Kapil Dataset:
+  Samples: 2218/2400
+  Classes: 24
+  Accuracy: 0.1700
+  Precision: 0.1364
+  Recall: 0.1700
+  F1-Score: 0.1349
+  Avg Inference: 32.10 ms
+  Memory Used: 54.01 MB
+
+Ayuraj Dataset:
+  Samples: 1101/1675
+  Classes: 24
+  Accuracy: 0.4782
+  Precision: 0.5022
+  Recall: 0.4782
+  F1-Score: 0.4488
+  Avg Inference: 32.25 ms
+  Memory Used: -6.48 MB
+
+======================================================================
+ResNet50 Model
+======================================================================
+
+Model Info:
+  Size: 211.05 MB
+  total_parameters: 24126616
+  trainable_parameters: 15512856
+  model_classes: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']
+
+Kapil Dataset:
+  Samples: 2400/2400
+  Classes: 24
+  Accuracy: 0.0750
+  Precision: 0.0501
+  Recall: 0.0750
+  F1-Score: 0.0345
+  Avg Inference: 30.99 ms
+  Memory Used: 3146.97 MB
+
+Ayuraj Dataset:
+  Samples: 1675/1675
+  Classes: 24
+  Accuracy: 0.0681
+  Precision: 0.0258
+  Recall: 0.0681
+  F1-Score: 0.0295
+  Avg Inference: 32.61 ms
+  Memory Used: 1802.46 MB
