@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASL Keyboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #videoContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #detectionOverlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            min-width: 250px;
+            z-index: 500;
+            font-size: 14px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .detection-status {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.active {
+            background: #10b981;
+        }
+
+        .status-indicator.inactive {
+            background: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .detection-info {
+            margin-top: 10px;
+        }
+
+        .detection-info div {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .detection-info label {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .detection-info span {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .gesture-display {
+            font-size: 48px;
+            text-align: center;
+            margin: 15px 0;
+            font-weight: bold;
+            color: #10b981;
+            text-shadow: 0 2px 10px rgba(16, 185, 129, 0.5);
+        }
+
+        #settingsToggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        #settingsToggle:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: rotate(90deg);
+        }
+
+        #settingsToggle svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        #settingsPanel {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 420px;
+            height: 100vh;
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(10px);
+            transition: right 0.3s ease;
+            z-index: 999;
+            color: #fff;
+            overflow-y: auto;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #settingsPanel.open {
+            right: 0;
+        }
+
+        .settings-header {
+            padding: 30px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .settings-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .settings-content {
+            padding: 25px;
+        }
+
+        .settings-section {
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .settings-section:last-child {
+            border-bottom: none;
+        }
+
+        .settings-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .setting-group select,
+        .setting-group input[type="range"],
+        .setting-group input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .setting-group select {
+            cursor: pointer;
+        }
+
+        .setting-group select option {
+            background: #1e1e1e;
+        }
+
+        .setting-group input[type="range"] {
+            padding: 0;
+            height: 6px;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+        }
+
+        .setting-group input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .setting-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .range-value {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .setting-group button {
+            width: 100%;
+            padding: 12px;
+            background: rgba(59, 130, 246, 0.8);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .setting-group button:hover {
+            background: rgba(59, 130, 246, 1);
+        }
+
+        .setting-group button.danger {
+            background: rgba(220, 38, 38, 0.8);
+        }
+
+        .setting-group button.danger:hover {
+            background: rgba(220, 38, 38, 1);
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .checkbox-wrapper:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 38, 38, 0.9);
+            color: #fff;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .success-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(16, 185, 129, 0.9);
+            color: #fff;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .statistics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card label {
+            display: block;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 5px;
+        }
+
+        .stat-card span {
+            display: block;
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        #typingInput {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        #typingInput:focus {
+            border-color: rgba(16, 185, 129, 0.6);
+        }
+
+        #typingInput::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 5px;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="videoContainer">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="detectionOverlay">
+        <div class="detection-status">
+            <span class="status-indicator inactive" id="statusIndicator"></span>
+            <span id="statusText">Initializing...</span>
+        </div>
+
+        <div class="gesture-display" id="gestureDisplay">-</div>
+
+        <div class="detection-info">
+            <div>
+                <label>Confidence:</label>
+                <span id="confidenceValue">0%</span>
+            </div>
+            <div>
+                <label>FPS:</label>
+                <span id="fpsValue">0</span>
+            </div>
+            <div>
+                <label>Hand:</label>
+                <span id="handValue">-</span>
+            </div>
+        </div>
+
+        <div class="statistics-grid" id="statsGrid" style="display: none;">
+            <div class="stat-card">
+                <label>Detections</label>
+                <span id="totalDetections">0</span>
+            </div>
+            <div class="stat-card">
+                <label>Avg Confidence</label>
+                <span id="avgConfidence">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <button id="pauseToggle" aria-label="Pause/Resume">
+        <svg id="pauseIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+        <svg id="playIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" style="display: none;">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+    </button>
+
+    <button id="settingsToggle" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
+        </svg>
+    </button>
+
+
+    <div id="settingsPanel">
+        <div class="settings-header">
+            <h2>Settings</h2>
+        </div>
+        <div class="settings-content">
+            <!-- Camera Settings -->
+            <div class="settings-section">
+                <h3>Camera Settings</h3>
+
+                <div class="setting-group">
+                    <label for="cameraSelect">Camera Device</label>
+                    <select id="cameraSelect">
+                        <option>Loading cameras...</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="resolutionSelect">Resolution</label>
+                    <select id="resolutionSelect">
+                        <option value="640x480">640 × 480</option>
+                        <option value="1280x720" selected>1280 × 720 (HD)</option>
+                        <option value="1920x1080">1920 × 1080 (Full HD)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="brightnessSlider">
+                        Brightness
+                        <span class="range-value" id="brightnessValue">100%</span>
+                    </label>
+                    <input type="range" id="brightnessSlider" min="50" max="150" value="100">
+                </div>
+
+                <div class="setting-group">
+                    <label for="contrastSlider">
+                        Contrast
+                        <span class="range-value" id="contrastValue">100%</span>
+                    </label>
+                    <input type="range" id="contrastSlider" min="50" max="150" value="100">
+                </div>
+
+                <div class="setting-group">
+                    <label for="saturationSlider">
+                        Saturation
+                        <span class="range-value" id="saturationValue">100%</span>
+                    </label>
+                    <input type="range" id="saturationSlider" min="0" max="200" value="100">
+                </div>
+            </div>
+
+            <!-- Detection Settings -->
+            <div class="settings-section">
+                <h3>Detection Settings</h3>
+
+                <div class="setting-group">
+                    <label for="handSelect">Hand Selection</label>
+                    <select id="handSelect">
+                        <option value="Left">Left Hand</option>
+                        <option value="Right">Right Hand</option>
+                        <option value="Both">Both Hands</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="detectionConfidence">
+                        Min Detection Confidence
+                        <span class="range-value" id="detectionConfidenceValue">0.70</span>
+                    </label>
+                    <input type="range" id="detectionConfidence" min="0" max="1" step="0.05" value="0.7">
+                    <div class="info-text">MediaPipe hand detection threshold</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="trackingConfidence">
+                        Min Tracking Confidence
+                        <span class="range-value" id="trackingConfidenceValue">0.50</span>
+                    </label>
+                    <input type="range" id="trackingConfidence" min="0" max="1" step="0.05" value="0.5">
+                    <div class="info-text">MediaPipe hand tracking threshold</div>
+                </div>
+            </div>
+
+            <!-- Gesture Recognition Settings -->
+            <div class="settings-section">
+                <h3>Gesture Recognition</h3>
+
+                <div class="setting-group">
+                    <label for="confidenceThreshold">
+                        Gesture Confidence Threshold
+                        <span class="range-value" id="confidenceThresholdValue">0.15</span>
+                    </label>
+                    <input type="range" id="confidenceThreshold" min="0" max="1" step="0.05" value="0.15">
+                    <div class="info-text">Minimum confidence to consider a prediction</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="windowMs">
+                        Detection Window (ms)
+                        <span class="range-value" id="windowMsValue">500</span>
+                    </label>
+                    <input type="range" id="windowMs" min="100" max="2000" step="100" value="500">
+                    <div class="info-text">Time window for gesture consistency</div>
+                </div>
+
+                <div class="setting-group">
+                    <label for="consistencyThreshold">
+                        Consistency Threshold
+                        <span class="range-value" id="consistencyThresholdValue">0.70</span>
+                    </label>
+                    <input type="range" id="consistencyThreshold" min="0" max="1" step="0.05" value="0.70">
+                    <div class="info-text">% of frames that must show same gesture</div>
+                </div>
+            </div>
+
+            <!-- Keyboard Automation -->
+            <div class="settings-section">
+                <h3>Keyboard Automation</h3>
+
+                <div class="setting-group">
+                    <label class="checkbox-wrapper">
+                        <input type="checkbox" id="enableKeyboard" checked>
+                        <span>Enable Keyboard Automation</span>
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label for="cooldownMs">
+                        Key Press Cooldown (ms)
+                        <span class="range-value" id="cooldownMsValue">500</span>
+                    </label>
+                    <input type="range" id="cooldownMs" min="100" max="2000" step="100" value="500">
+                    <div class="info-text">Minimum time between key presses</div>
+                </div>
+            </div>
+
+            <!-- Performance Settings -->
+            <div class="settings-section">
+                <h3>Performance</h3>
+
+                <div class="setting-group">
+                    <label for="processingInterval">
+                        Processing Interval (ms)
+                        <span class="range-value" id="processingIntervalValue">100</span>
+                    </label>
+                    <input type="range" id="processingInterval" min="50" max="500" step="50" value="100">
+                    <div class="info-text">How often to process frames</div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="settings-section">
+                <h3>Actions</h3>
+
+                <div class="setting-group">
+                    <button id="showStatsButton">Show Statistics</button>
+                </div>
+
+                <div class="setting-group">
+                    <button id="clearHistoryButton" class="danger">Clear Detection History</button>
+                </div>
+
+                <div class="setting-group">
+                    <button id="resetButton">Reset to Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="error-message" id="errorMessage">
+        Unable to access webcam. Please check permissions.
+    </div>
+
+    <div class="success-message" id="successMessage">
+        Operation successful!
+    </div>
+
+    <div style="position: fixed; bottom: 20px; left: 20px; width: 50%; max-width: 500px; z-index: 1000;">
+        <input type="text" id="typingInput" placeholder="Type here to test...">
+    </div>
+
+    <script>
+        // Configuration
+        const TOKEN = '{{ token }}';
+        const API_BASE = '/api';
+
+        // DOM Elements
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const settingsToggle = document.getElementById('settingsToggle');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const resolutionSelect = document.getElementById('resolutionSelect');
+        const brightnessSlider = document.getElementById('brightnessSlider');
+        const contrastSlider = document.getElementById('contrastSlider');
+        const saturationSlider = document.getElementById('saturationSlider');
+
+        // Detection settings
+        const handSelect = document.getElementById('handSelect');
+        const detectionConfidence = document.getElementById('detectionConfidence');
+        const trackingConfidence = document.getElementById('trackingConfidence');
+        const confidenceThreshold = document.getElementById('confidenceThreshold');
+        const windowMs = document.getElementById('windowMs');
+        const consistencyThreshold = document.getElementById('consistencyThreshold');
+        const enableKeyboard = document.getElementById('enableKeyboard');
+        const cooldownMs = document.getElementById('cooldownMs');
+        const processingInterval = document.getElementById('processingInterval');
+
+        // Buttons
+        const resetButton = document.getElementById('resetButton');
+        const clearHistoryButton = document.getElementById('clearHistoryButton');
+        const showStatsButton = document.getElementById('showStatsButton');
+
+        // Messages
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        // Status elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const gestureDisplay = document.getElementById('gestureDisplay');
+        const confidenceValue = document.getElementById('confidenceValue');
+        const fpsValue = document.getElementById('fpsValue');
+        const handValue = document.getElementById('handValue');
+        const statsGrid = document.getElementById('statsGrid');
+        const totalDetections = document.getElementById('totalDetections');
+        const avgConfidence = document.getElementById('avgConfidence');
+
+        // State
+        let currentStream = null;
+        let processingIntervalId = null;
+        let isProcessing = false;
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
+        let statsVisible = false;
+        let currentConfig = {};
+
+        // Toggle settings panel
+        settingsToggle.addEventListener('click', () => {
+            settingsPanel.classList.toggle('open');
+        });
+
+        // Show message functions
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+            }, 2000);
+        }
+
+        // API call helper
+        async function apiCall(endpoint, data = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: TOKEN,
+                        ...data
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'API call failed');
+                }
+
+                return result;
+            } catch (error) {
+                console.error(`API Error (${endpoint}):`, error);
+                throw error;
+            }
+        }
+
+        // Get available cameras
+        async function getCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(device => device.kind === 'videoinput');
+
+                cameraSelect.innerHTML = '';
+                cameras.forEach((camera, index) => {
+                    const option = document.createElement('option');
+                    option.value = camera.deviceId;
+                    option.text = camera.label || `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+            } catch (err) {
+                console.error('Error getting cameras:', err);
+                showError('Failed to load cameras');
+            }
+        }
+
+        // Start webcam
+        async function startWebcam(deviceId = null) {
+            try {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+
+                const [width, height] = resolutionSelect.value.split('x').map(Number);
+                const constraints = {
+                    video: {
+                        width: { ideal: width },
+                        height: { ideal: height },
+                        ...(deviceId && { deviceId: { exact: deviceId } })
+                    }
+                };
+
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        resolve();
+                    };
+                });
+
+                statusIndicator.classList.remove('inactive');
+                statusIndicator.classList.add('active');
+                statusText.textContent = 'Active';
+
+                startProcessing();
+
+            } catch (err) {
+                console.error('Error accessing webcam:', err);
+                showError('Unable to access webcam. Please check permissions.');
+                statusIndicator.classList.remove('active');
+                statusIndicator.classList.add('inactive');
+                statusText.textContent = 'Inactive';
+            }
+        }
+
+        // Capture and encode frame
+        function captureFrame() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const base64 = dataUrl.split(',')[1];
+
+            return base64;
+        }
+
+        // Process frame and get prediction
+        async function processFrame() {
+            if (isProcessing || !video.videoWidth) return;
+
+            isProcessing = true;
+
+            try {
+                const frameData = captureFrame();
+
+                const result = await apiCall('/predict', {
+                    frame: frameData
+                });
+
+                if (result.detected) {
+                    gestureDisplay.textContent = result.gesture || '-';
+                    confidenceValue.textContent = `${Math.round((result.confidence || 0) * 100)}%`;
+                    gestureDisplay.style.color = result.confidence > 0.7 ? '#10b981' : '#f59e0b';
+                } else {
+                    gestureDisplay.textContent = '-';
+                    confidenceValue.textContent = '0%';
+                    gestureDisplay.style.color = '#6b7280';
+                }
+
+                // Update FPS
+                frameCount++;
+                const now = Date.now();
+                if (now - lastFpsUpdate >= 1000) {
+                    fpsValue.textContent = frameCount;
+                    frameCount = 0;
+                    lastFpsUpdate = now;
+                }
+
+            } catch (error) {
+                console.error('Processing error:', error);
+            } finally {
+                isProcessing = false;
+            }
+        }
+
+        // Start/stop processing
+        function startProcessing() {
+            if (processingIntervalId) {
+                clearInterval(processingIntervalId);
+            }
+
+            const interval = parseInt(processingInterval.value);
+            processingIntervalId = setInterval(processFrame, interval);
+        }
+
+        function stopProcessing() {
+            if (processingIntervalId) {
+                clearInterval(processingIntervalId);
+                processingIntervalId = null;
+            }
+        }
+
+        // Get statistics
+        async function updateStatistics() {
+            try {
+                const result = await apiCall('/statistics', {
+                    window_ms: parseInt(windowMs.value)
+                });
+
+                if (result.statistics) {
+                    const stats = result.statistics;
+                    totalDetections.textContent = stats.total_detections || 0;
+                    avgConfidence.textContent = `${Math.round((stats.average_confidence || 0) * 100)}%`;
+                }
+            } catch (error) {
+                console.error('Statistics error:', error);
+            }
+        }
+
+        // Load configuration
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                const result = await response.json();
+
+                if (result.success && result.config) {
+                    currentConfig = result.config;
+
+                    // Update UI with config values
+                    if (result.config.selected_hand !== undefined) {
+                        handSelect.value = result.config.selected_hand;
+                        handValue.textContent = result.config.selected_hand;
+                    }
+
+                    if (result.config.min_detection_confidence !== undefined) {
+                        detectionConfidence.value = result.config.min_detection_confidence;
+                        document.getElementById('detectionConfidenceValue').textContent =
+                            result.config.min_detection_confidence.toFixed(2);
+                    }
+
+                    if (result.config.min_tracking_confidence !== undefined) {
+                        trackingConfidence.value = result.config.min_tracking_confidence;
+                        document.getElementById('trackingConfidenceValue').textContent =
+                            result.config.min_tracking_confidence.toFixed(2);
+                    }
+
+                    if (result.config.confidence_threshold !== undefined) {
+                        confidenceThreshold.value = result.config.confidence_threshold;
+                        document.getElementById('confidenceThresholdValue').textContent =
+                            result.config.confidence_threshold.toFixed(2);
+                    }
+
+                    if (result.config.window_ms !== undefined) {
+                        windowMs.value = result.config.window_ms;
+                        document.getElementById('windowMsValue').textContent = result.config.window_ms;
+                    }
+
+                    if (result.config.consistency_threshold !== undefined) {
+                        consistencyThreshold.value = result.config.consistency_threshold;
+                        document.getElementById('consistencyThresholdValue').textContent =
+                            result.config.consistency_threshold.toFixed(2);
+                    }
+
+                    if (result.config.enable_keyboard !== undefined) {
+                        enableKeyboard.checked = result.config.enable_keyboard;
+                    }
+
+                    if (result.config.cooldown_ms !== undefined) {
+                        cooldownMs.value = result.config.cooldown_ms;
+                        document.getElementById('cooldownMsValue').textContent = result.config.cooldown_ms;
+                    }
+                }
+            } catch (error) {
+                console.error('Config load error:', error);
+            }
+        }
+
+        // Save configuration
+        async function saveConfig(configUpdates) {
+            try {
+                await apiCall('/config', {
+                    config: configUpdates
+                });
+                showSuccess('Configuration updated');
+            } catch (error) {
+                showError('Failed to update configuration');
+            }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const brightness = brightnessSlider.value;
+            const contrast = contrastSlider.value;
+            const saturation = saturationSlider.value;
+
+            video.style.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+
+            document.getElementById('brightnessValue').textContent = `${brightness}%`;
+            document.getElementById('contrastValue').textContent = `${contrast}%`;
+            document.getElementById('saturationValue').textContent = `${saturation}%`;
+        }
+
+        // Event listeners - Camera Settings
+        cameraSelect.addEventListener('change', () => {
+            startWebcam(cameraSelect.value);
+        });
+
+        resolutionSelect.addEventListener('change', () => {
+            startWebcam(cameraSelect.value);
+        });
+
+        brightnessSlider.addEventListener('input', applyFilters);
+        contrastSlider.addEventListener('input', applyFilters);
+        saturationSlider.addEventListener('input', applyFilters);
+
+        // Event listeners - Detection Settings
+        handSelect.addEventListener('change', async () => {
+            const value = handSelect.value;
+            handValue.textContent = value;
+            await saveConfig({ selected_hand: value });
+        });
+
+        detectionConfidence.addEventListener('change', async () => {
+            const value = parseFloat(detectionConfidence.value);
+            document.getElementById('detectionConfidenceValue').textContent = value.toFixed(2);
+            await saveConfig({ min_detection_confidence: value });
+        });
+
+        trackingConfidence.addEventListener('change', async () => {
+            const value = parseFloat(trackingConfidence.value);
+            document.getElementById('trackingConfidenceValue').textContent = value.toFixed(2);
+            await saveConfig({ min_tracking_confidence: value });
+        });
+
+        // Event listeners - Gesture Recognition Settings
+        confidenceThreshold.addEventListener('change', async () => {
+            const value = parseFloat(confidenceThreshold.value);
+            document.getElementById('confidenceThresholdValue').textContent = value.toFixed(2);
+            await saveConfig({ confidence_threshold: value });
+        });
+
+        windowMs.addEventListener('change', async () => {
+            const value = parseInt(windowMs.value);
+            document.getElementById('windowMsValue').textContent = value;
+            await saveConfig({ window_ms: value });
+        });
+
+        consistencyThreshold.addEventListener('change', async () => {
+            const value = parseFloat(consistencyThreshold.value);
+            document.getElementById('consistencyThresholdValue').textContent = value.toFixed(2);
+            await saveConfig({ consistency_threshold: value });
+        });
+
+        // Event listeners - Keyboard Automation
+        enableKeyboard.addEventListener('change', async () => {
+            const value = enableKeyboard.checked;
+            await saveConfig({ enable_keyboard: value });
+        });
+
+        cooldownMs.addEventListener('change', async () => {
+            const value = parseInt(cooldownMs.value);
+            document.getElementById('cooldownMsValue').textContent = value;
+            await saveConfig({ cooldown_ms: value });
+        });
+
+        // Event listeners - Performance
+        processingInterval.addEventListener('input', () => {
+            const value = parseInt(processingInterval.value);
+            document.getElementById('processingIntervalValue').textContent = value;
+            startProcessing();
+        });
+
+        // Event listeners - Actions
+        showStatsButton.addEventListener('click', () => {
+            statsVisible = !statsVisible;
+            statsGrid.style.display = statsVisible ? 'grid' : 'none';
+            showStatsButton.textContent = statsVisible ? 'Hide Statistics' : 'Show Statistics';
+
+            if (statsVisible) {
+                updateStatistics();
+                setInterval(() => {
+                    if (statsVisible) updateStatistics();
+                }, 2000);
+            }
+        });
+
+        clearHistoryButton.addEventListener('click', async () => {
+            try {
+                await apiCall('/clear_history');
+                showSuccess('Detection history cleared');
+                gestureDisplay.textContent = '-';
+                confidenceValue.textContent = '0%';
+                totalDetections.textContent = '0';
+                avgConfidence.textContent = '0%';
+            } catch (error) {
+                showError('Failed to clear history');
+            }
+        });
+
+        resetButton.addEventListener('click', async () => {
+            // Reset visual filters
+            brightnessSlider.value = 100;
+            contrastSlider.value = 100;
+            saturationSlider.value = 100;
+            applyFilters();
+
+            // Reset detection settings to defaults
+            handSelect.value = 'Left';
+            detectionConfidence.value = 0.7;
+            trackingConfidence.value = 0.5;
+            confidenceThreshold.value = 0.15;
+            windowMs.value = 500;
+            consistencyThreshold.value = 0.70;
+            enableKeyboard.checked = true;
+            cooldownMs.value = 500;
+            processingInterval.value = 100;
+
+            // Update displays
+            document.getElementById('detectionConfidenceValue').textContent = '0.70';
+            document.getElementById('trackingConfidenceValue').textContent = '0.50';
+            document.getElementById('confidenceThresholdValue').textContent = '0.15';
+            document.getElementById('windowMsValue').textContent = '500';
+            document.getElementById('consistencyThresholdValue').textContent = '0.70';
+            document.getElementById('cooldownMsValue').textContent = '500';
+            document.getElementById('processingIntervalValue').textContent = '100';
+            handValue.textContent = 'Left';
+
+            // Save config
+            await saveConfig({
+                selected_hand: 'Left',
+                min_detection_confidence: 0.7,
+                min_tracking_confidence: 0.5,
+                confidence_threshold: 0.15,
+                window_ms: 500,
+                consistency_threshold: 0.70,
+                enable_keyboard: true,
+                cooldown_ms: 500
+            });
+
+            startProcessing();
+        });
+
+        // Initialize
+        (async () => {
+            await getCameras();
+            await loadConfig();
+            await startWebcam();
+            applyFilters();
+        })();
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopProcessing();
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+
+</html>

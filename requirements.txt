@@ -1,0 +1,8 @@
+Flask
+pywebview
+opencv-python
+numpy
+mediapipe
+joblib
+pyautogui
+scikit-learn
